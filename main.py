@@ -1,10 +1,16 @@
 import numpy as np
 import torch
+import cv2
 import argparse
+import os
+from PIL import Image
 from torch.utils.data import DataLoader
 from torch import autograd, optim
 from torchvision.transforms import transforms
+from torchvision.utils import save_image
+from stackimage import stackImages
 from unet import Unet
+from skimage import img_as_ubyte
 from dataset import LiverDataset
 
 # 是否使用cuda
@@ -69,20 +75,35 @@ def test_1():
     model.eval()
     import matplotlib.pyplot as plt
     plt.ion()
-    i=0
+    imgs = []
+    root = "data/val"
+    n = len(os.listdir(root)) // 2
+    for i in range(n):
+        img = os.path.join(root, "%03d.png" % i)
+        # mask = os.path.join(root, "%03d_mask.png" % i)
+        imgs.append(img)
+    i = 0
     with torch.no_grad():
         for x, _ in dataloaders:
             y = model(x)
+            img_x = torch.squeeze(_).numpy()
             img_y = torch.squeeze(y).numpy()
-            plt.imshow(img_y)
-            i=i+1
+            img_input = cv2.imread(imgs[i],cv2.IMREAD_GRAYSCALE)
+            im_color = cv2.applyColorMap(img_input, cv2.COLORMAP_JET)
+            img_x = img_as_ubyte(img_x)
+            img_y = img_as_ubyte(img_y)
+            imgStack = stackImages(0.8, [[img_input, img_x, img_y]])
+            # 转为伪彩色，视情况可以加上
+            # imgStack = cv2.applyColorMap(imgStack, cv2.COLORMAP_JET)
+            cv2.imwrite(f'train_img/{i}.png',imgStack)
+            plt.imshow(imgStack)
+            i = i + 1
             plt.pause(0.1)
         plt.show()
 
 
-
 parse = argparse.ArgumentParser()
-#parse.add_argument("action", type=str, help="train or test")
+# parse.add_argument("action", type=str, help="train or test")
 parse.add_argument("--batch_size", type=int, default=1)
 parse.add_argument("--ckp", type=str, help="the path of model weight file")
 args = parse.parse_args()
